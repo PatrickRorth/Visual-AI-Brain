@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Energy Core</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000000;
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  #scene {
+    position: fixed;
+    inset: 0;
+  }
+  canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* ---------- Control panel ---------- */
+  #panelToggle {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 20;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    background: rgba(1, 10, 15, 0.7);
+    color: #36FFFF;
+    font-size: 18px;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: box-shadow .2s, transform .2s;
+  }
+  #panelToggle:hover {
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+    transform: rotate(30deg);
+  }
+  #panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 10;
+    width: 300px;
+    max-height: 100vh;
+    overflow-y: auto;
+    padding: 56px 16px 20px;
+    box-sizing: border-box;
+    background: rgba(1, 10, 15, 0.82);
+    border-left: 1px solid rgba(0, 229, 255, 0.25);
+    backdrop-filter: blur(10px);
+    color: #A5FFFF;
+    font-size: 12px;
+    transition: transform .3s ease;
+  }
+  #panel.hidden { transform: translateX(110%); }
+  #panel::-webkit-scrollbar { width: 6px; }
+  #panel::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.3); border-radius: 3px; }
+  #panel h2 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #36FFFF;
+  }
+  #panel .sub { margin: 0 0 14px; opacity: .55; font-size: 11px; }
+  .group { margin-bottom: 6px; border: 1px solid rgba(0, 229, 255, 0.15); border-radius: 8px; overflow: hidden; }
+  .group > .ghead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    cursor: pointer;
+    background: rgba(0, 229, 255, 0.06);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 11px;
+    color: #7FFFFF;
+    user-select: none;
+  }
+  .group > .ghead:hover { background: rgba(0, 229, 255, 0.12); }
+  .group > .gbody { padding: 8px 10px 10px; display: none; }
+  .group.open > .gbody { display: block; }
+  .group .arrow { transition: transform .2s; opacity: .6; }
+  .group.open .arrow { transform: rotate(90deg); }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 7px 0;
+  }
+  .row label { flex: 0 0 108px; opacity: .85; }
+  .row input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0, 229, 255, 0.25);
+    outline: none;
+  }
+  .row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #00E5FF;
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.8);
+    cursor: pointer;
+  }
+  .row input[type=color] {
+    flex: 1;
+    height: 24px;
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    padding: 1px 2px;
+  }
+  .row .val {
+    flex: 0 0 44px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #36FFFF;
+    opacity: .9;
+  }
+  .btnrow { display: flex; gap: 8px; margin-top: 12px; }
+  .btnrow button {
+    flex: 1;
+    padding: 8px 0;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    background: rgba(0, 229, 255, 0.08);
+    color: #36FFFF;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background .2s, box-shadow .2s;
+  }
+  .btnrow button:hover {
+    background: rgba(0, 229, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+  }
+  #statusMsg {
+    margin: 10px 0 0;
+    min-height: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: #36FFFF;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  #statusMsg.show { opacity: 0.9; }
+</style>
+</head>
+<body>
+<div id="scene">
+  <canvas id="fogCanvas"></canvas>
+  <canvas id="glowCanvas"></canvas>
+</div>
+
+<button id="panelToggle" title="Settings">&#9881;</button>
+<div id="panel" class="hidden">
+  <h2>Energy Core</h2>
+  <p class="sub">Adjust all parameters live</p>
+  <div id="groups"></div>
+  <div class="btnrow">
+    <button id="saveBtn">Save</button>
+    <button id="exportBtn">Export JSON</button>
+  </div>
+  <div class="btnrow">
+    <button id="importBtn">Import JSON</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+  <div class="btnrow">
+    <button id="hideBtn">Hide panel</button>
+  </div>
+  <p id="statusMsg"></p>
+  <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Configuration ----------
+  const DEFAULTS = {
+    // Ring
+    ringSize: 0.28, cycle: 12, deform1: 0.22, deform2: 0.10, deform3: 0.045,
+    // Particles
+    particleCount: 12000, particleSize: 1.0, particleSpeed: 1.0,
+    particleSpread: 0.34, particleOpacity: 0.8, flicker: 0.65,
+    // Network
+    linkSample: 220, linkDist: 0.16, linkOpacity: 0.22, linkWidth: 0.5,
+    // Bands
+    bandCount: 5, bandOpacity: 0.10, bandWidth: 1.0,
+    // Core
+    coreSize: 0.16, coreIntensity: 1.0, corePulse: 0.15,
+    // Glow
+    glow1: 5, glow2: 20, glow3: 50, glowColor: "#00ffff",
+    // Atmosphere
+    fogIntensity: 1.0, vignette: 0.85, fogColor: "#006e82",
+    // Colors
+    col1: "#00D4D4", col2: "#00E5FF", col3: "#36FFFF",
+    col4: "#7FFFFF", col5: "#A5FFFF",
+    bg0: "#02131A", bg1: "#010A0F", bg2: "#000000",
+  };
+  const CFG = { ...DEFAULTS };
+
+  // ---------- Persistence (localStorage) ----------
+  const STORAGE_KEY = "aiEnergyRingSettings";
+
+  function applySettings(obj) {
+    let applied = 0;
+    for (const k in DEFAULTS) {
+      if (obj && Object.prototype.hasOwnProperty.call(obj, k)) {
+        const v = obj[k];
+        if (typeof DEFAULTS[k] === "number" && typeof v === "number" && isFinite(v)) { CFG[k] = v; applied++; }
+        else if (typeof DEFAULTS[k] === "string" && typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) { CFG[k] = v; applied++; }
+      }
+    }
+    return applied;
+  }
+
+  // Load saved settings before anything renders
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) applySettings(JSON.parse(raw));
+  } catch (e) { /* corrupt data — ignore, use defaults */ }
+
+  function saveSettings() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(CFG)); } catch (e) {}
+  }
+
+  let saveTimer = null;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveSettings, 300);
+  }
+
+  // ---------- Canvas setup ----------
+  const scene = document.getElementById("scene");
+  const fogCanvas = document.getElementById("fogCanvas");
+  const glowCanvas = document.getElementById("glowCanvas");
+  const fctx = fogCanvas.getContext("2d");
+  const ctx = glowCanvas.getContext("2d");
+
+  let W = 0, H = 0, CX = 0, CY = 0, R = 0, DPR = 1;
+
+  function computeR() { R = Math.min(W, H) * CFG.ringSize; }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    for (const c of [fogCanvas, glowCanvas]) {
+      c.width = W * DPR;
+      c.height = H * DPR;
+    }
+    CX = W / 2;
+    CY = H / 2;
+    computeR();
+  }
+  window.addEventListener("resize", () => { resize(); initParticles(); });
+  resize();
+
+  // ---------- Helpers ----------
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgba(hex, a) {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  function getPalette() { return [CFG.col1, CFG.col2, CFG.col3, CFG.col4, CFG.col5]; }
+
+  function applyBackground() {
+    scene.style.background =
+      `radial-gradient(ellipse at center, ${CFG.bg0} 0%, ${CFG.bg1} 45%, ${CFG.bg2} 100%)`;
+  }
+  function applyGlow() {
+    const c = CFG.glowColor;
+    glowCanvas.style.filter =
+      `drop-shadow(0 0 ${CFG.glow1}px ${c}) ` +
+      `drop-shadow(0 0 ${CFG.glow2}px ${rgba(c, 0.55)}) ` +
+      `drop-shadow(0 0 ${CFG.glow3}px ${rgba(c, 0.35)})`;
+  }
+  applyBackground();
+  applyGlow();
+
+  // ---------- Simplex-style 3D noise ----------
+  const perm = new Uint8Array(512);
+  (() => {
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    let seed = 1337;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  })();
+
+  const grad3 = [
+    [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+    [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+    [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]
+  ];
+
+  function noise3(x, y, z) {
+    const F3 = 1/3, G3 = 1/6;
+    const s = (x + y + z) * F3;
+    const i = Math.floor(x + s), j = Math.floor(y + s), k = Math.floor(z + s);
+    const t = (i + j + k) * G3;
+    const x0 = x - (i - t), y0 = y - (j - t), z0 = z - (k - t);
+
+    let i1, j1, k1, i2, j2, k2;
+    if (x0 >= y0) {
+      if (y0 >= z0)      { i1=1;j1=0;k1=0; i2=1;j2=1;k2=0; }
+      else if (x0 >= z0) { i1=1;j1=0;k1=0; i2=1;j2=0;k2=1; }
+      else               { i1=0;j1=0;k1=1; i2=1;j2=0;k2=1; }
+    } else {
+      if (y0 < z0)       { i1=0;j1=0;k1=1; i2=0;j2=1;k2=1; }
+      else if (x0 < z0)  { i1=0;j1=1;k1=0; i2=0;j2=1;k2=1; }
+      else               { i1=0;j1=1;k1=0; i2=1;j2=1;k2=0; }
+    }
+
+    const x1 = x0 - i1 + G3,   y1 = y0 - j1 + G3,   z1 = z0 - k1 + G3;
+    const x2 = x0 - i2 + 2*G3, y2 = y0 - j2 + 2*G3, z2 = z0 - k2 + 2*G3;
+    const x3 = x0 - 1 + 3*G3,  y3 = y0 - 1 + 3*G3,  z3 = z0 - 1 + 3*G3;
+
+    const ii = i & 255, jj = j & 255, kk = k & 255;
+    let n = 0;
+
+    let t0 = 0.6 - x0*x0 - y0*y0 - z0*z0;
+    if (t0 > 0) {
+      const g = grad3[perm[ii + perm[jj + perm[kk]]] % 12];
+      t0 *= t0;
+      n += t0 * t0 * (g[0]*x0 + g[1]*y0 + g[2]*z0);
+    }
+    let t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
+    if (t1 > 0) {
+      const g = grad3[perm[ii+i1 + perm[jj+j1 + perm[kk+k1]]] % 12];
+      t1 *= t1;
+      n += t1 * t1 * (g[0]*x1 + g[1]*y1 + g[2]*z1);
+    }
+    let t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
+    if (t2 > 0) {
+      const g = grad3[perm[ii+i2 + perm[jj+j2 + perm[kk+k2]]] % 12];
+      t2 *= t2;
+      n += t2 * t2 * (g[0]*x2 + g[1]*y2 + g[2]*z2);
+    }
+    let t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
+    if (t3 > 0) {
+      const g = grad3[perm[ii+1 + perm[jj+1 + perm[kk+1]]] % 12];
+      t3 *= t3;
+      n += t3 * t3 * (g[0]*x3 + g[1]*y3 + g[2]*z3);
+    }
+    return 32 * n;
+  }
+
+  // ---------- Ring deformation ----------
+  function ringRadius(angle, time, layer) {
+    const t = time / CFG.cycle;
+    const nx = Math.cos(angle), ny = Math.sin(angle);
+    let r = R;
+    r += noise3(nx * 0.9 + layer, ny * 0.9, t)        * R * CFG.deform1;
+    r += noise3(nx * 2.2 - layer, ny * 2.2, t * 1.6)  * R * CFG.deform2;
+    r += noise3(nx * 4.5, ny * 4.5 + layer, t * 2.3)  * R * CFG.deform3;
+    return r;
+  }
+
+  // ---------- Particles ----------
+  let particles = [];
+
+  function makeParticle(p) {
+    p = p || {};
+    p.angle = Math.random() * Math.PI * 2;
+    p.speed = (0.04 + Math.random() * 0.12) * (Math.random() < 0.5 ? 1 : -1) * 0.35;
+    p.layer = Math.random() * 3;
+    p.offsetF = (Math.random() - 0.5) * 2;
+    p.drift = Math.random() * Math.PI * 2;
+    p.size = 0.4 + Math.random() * 1.3;
+    p.color = getPalette()[(Math.random() * 5) | 0];
+    p.life = 0;
+    p.maxLife = 6 + Math.random() * 14;
+    p.x = 0; p.y = 0;
+    return p;
+  }
+
+  function initParticles() {
+    const n = Math.round(CFG.particleCount);
+    particles = [];
+    for (let i = 0; i < n; i++) {
+      const p = makeParticle();
+      p.life = Math.random() * p.maxLife;
+      particles.push(p);
+    }
+  }
+  initParticles();
+
+  function recolorParticles() {
+    const pal = getPalette();
+    for (const p of particles) p.color = pal[(Math.random() * 5) | 0];
+  }
+
+  // ---------- Fog / atmosphere ----------
+  function drawFog(time) {
+    fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fctx.clearRect(0, 0, W, H);
+
+    const fi = CFG.fogIntensity;
+    const breathe = 1 + Math.sin(time * (Math.PI * 2 / CFG.cycle)) * 0.06;
+    const [fr_, fg_, fb_] = hexToRgb(CFG.fogColor);
+
+    let g = fctx.createRadialGradient(CX, CY, 0, CX, CY, R * 3.2 * breathe);
+    g.addColorStop(0,   `rgba(${fr_},${fg_},${fb_},${0.16 * fi})`);
+    g.addColorStop(0.3, `rgba(${fr_},${fg_},${fb_},${0.10 * fi})`);
+    g.addColorStop(0.65,`rgba(${Math.floor(fr_*.3)},${Math.floor(fg_*.3)},${Math.floor(fb_*.3)},${0.05 * fi})`);
+    g.addColorStop(1,   "rgba(0,0,0,0)");
+    fctx.fillStyle = g;
+    fctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < 5; i++) {
+      const a = time * 0.05 + i * 2.4;
+      const fx = CX + Math.cos(a) * R * (0.5 + i * 0.18);
+      const fy = CY + Math.sin(a * 0.7) * R * (0.35 + i * 0.12);
+      const fr2 = R * (0.9 + 0.35 * Math.sin(time * 0.1 + i));
+      const fg2 = fctx.createRadialGradient(fx, fy, 0, fx, fy, fr2);
+      fg2.addColorStop(0, `rgba(${fr_},${fg_},${fb_},${0.045 * fi})`);
+      fg2.addColorStop(1, "rgba(0,0,0,0)");
+      fctx.fillStyle = fg2;
+      fctx.fillRect(fx - fr2, fy - fr2, fr2 * 2, fr2 * 2);
+    }
+
+    g = fctx.createRadialGradient(CX, CY, Math.min(W, H) * 0.25, CX, CY, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, `rgba(0,0,0,${CFG.vignette})`);
+    fctx.fillStyle = g;
+    fctx.fillRect(0, 0, W, H);
+  }
+
+  // ---------- Core ----------
+  function drawCore(time) {
+    if (CFG.coreSize <= 0) return;
+    const pulse = (1 - CFG.corePulse) + CFG.corePulse * Math.sin(time * (Math.PI * 2 / CFG.cycle) * 1.5);
+    const coreR = Math.max(R * CFG.coreSize * pulse, 0.5);
+    const ci = CFG.coreIntensity;
+
+    let g = ctx.createRadialGradient(CX, CY, 0, CX, CY, coreR * 5);
+    g.addColorStop(0,   rgba(CFG.col5, 0.55 * ci));
+    g.addColorStop(0.15, rgba(CFG.col3, 0.30 * ci));
+    g.addColorStop(0.4, rgba(CFG.col1, 0.10 * ci));
+    g.addColorStop(1,   "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(CX, CY, coreR * 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    g = ctx.createRadialGradient(CX, CY, 0, CX, CY, coreR);
+    g.addColorStop(0, `rgba(255,255,255,${Math.min(0.95 * ci, 1)})`);
+    g.addColorStop(0.35, rgba(CFG.col5, Math.min(0.85 * ci, 1)));
+    g.addColorStop(1, rgba(CFG.col2, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(CX, CY, coreR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---------- Energy bands ----------
+  function drawBands(time) {
+    ctx.lineCap = "round";
+    const STEPS = 140;
+    const count = Math.round(CFG.bandCount);
+    for (let b = 0; b < count; b++) {
+      const layer = b * 1.7;
+      const alpha = CFG.bandOpacity + CFG.bandOpacity * 0.5 * Math.sin(time * 0.4 + b * 1.3);
+      ctx.strokeStyle = b % 2 === 0
+        ? rgba(CFG.col2, alpha)
+        : rgba(CFG.col3, alpha * 0.8);
+      ctx.lineWidth = (b === 0 ? 1.4 : 0.8) * CFG.bandWidth;
+      ctx.beginPath();
+      for (let s = 0; s <= STEPS; s++) {
+        const a = (s / STEPS) * Math.PI * 2;
+        const r = ringRadius(a, time + b * 0.7, layer)
+                + Math.sin(a * 3 + time * 0.5 + b) * R * 0.02;
+        const x = CX + Math.cos(a) * r;
+        const y = CY + Math.sin(a) * r;
+        if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+
+  // ---------- Animation loop ----------
+  let last = performance.now();
+  let fogTimer = 0;
+
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    const time = now / 1000;
+
+    fogTimer -= dt;
+    if (fogTimer <= 0) {
+      drawFog(time);
+      fogTimer = 1 / 12;
+    }
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = "lighter";
+
+    drawCore(time);
+    drawBands(time);
+
+    const t = time / CFG.cycle;
+    const sizeMul = CFG.particleSize;
+    const spread = CFG.particleSpread;
+    const spdMul = CFG.particleSpeed;
+    const baseAlpha = CFG.particleOpacity;
+    const flicker = CFG.flicker;
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+
+      p.life += dt;
+      if (p.life > p.maxLife) makeParticle(p);
+
+      p.angle += p.speed * spdMul * dt;
+      p.drift += dt * 0.3;
+
+      const baseR = ringRadius(p.angle, time, p.layer);
+      const wob = noise3(
+        Math.cos(p.angle) * 1.5 + p.layer * 2,
+        Math.sin(p.angle) * 1.5,
+        t * 2 + p.drift * 0.1
+      ) * R * 0.12;
+
+      const r = baseR + p.offsetF * R * spread * 0.5 + wob;
+      p.x = CX + Math.cos(p.angle) * r;
+      p.y = CY + Math.sin(p.angle) * r;
+
+      const lr = p.life / p.maxLife;
+      let fade = lr < 0.15 ? lr / 0.15 : lr > 0.8 ? (1 - lr) / 0.2 : 1;
+      fade *= (1 - flicker) + flicker * Math.abs(noise3(p.angle, p.layer, t * 3));
+
+      const sz = p.size * sizeMul;
+      ctx.globalAlpha = fade * baseAlpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
+    }
+
+    // Living network connections
+    if (CFG.linkSample > 0 && CFG.linkOpacity > 0) {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = CFG.linkWidth;
+      const maxDist = R * CFG.linkDist;
+      const maxDist2 = maxDist * maxDist;
+      const stride = Math.max(1, Math.floor(particles.length / CFG.linkSample));
+
+      for (let i = 0; i < particles.length; i += stride) {
+        const a = particles[i];
+        for (let j = i + stride; j < particles.length && j < i + stride * 8; j += stride) {
+          const b = particles[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < maxDist2) {
+            const strength = 1 - d2 / maxDist2;
+            ctx.strokeStyle = rgba(CFG.col2, strength * CFG.linkOpacity);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+
+  // ====================================================================
+  // Control panel
+  // ====================================================================
+  const SCHEMA = [
+    { title: "Ring", items: [
+      { k: "ringSize",  l: "Size",          min: 0.05, max: 0.45, step: 0.005 },
+      { k: "cycle",     l: "Cycle (sec)",   min: 3,    max: 30,   step: 0.5 },
+      { k: "deform1",   l: "Deform large",  min: 0,    max: 0.6,  step: 0.01 },
+      { k: "deform2",   l: "Deform medium", min: 0,    max: 0.4,  step: 0.01 },
+      { k: "deform3",   l: "Deform fine",   min: 0,    max: 0.2,  step: 0.005 },
+    ]},
+    { title: "Particles", items: [
+      { k: "particleCount",   l: "Count",      min: 500, max: 40000, step: 500, reinit: true },
+      { k: "particleSize",    l: "Size",       min: 0.2, max: 4,   step: 0.05 },
+      { k: "particleSpeed",   l: "Speed",      min: 0,   max: 4,   step: 0.05 },
+      { k: "particleSpread",  l: "Spread",     min: 0,   max: 1.5, step: 0.01 },
+      { k: "particleOpacity", l: "Brightness", min: 0,   max: 1,   step: 0.01 },
+      { k: "flicker",         l: "Flicker",    min: 0,   max: 1,   step: 0.01 },
+    ]},
+    { title: "Network", items: [
+      { k: "linkSample",  l: "Connections", min: 0,    max: 800, step: 10 },
+      { k: "linkDist",    l: "Range",       min: 0.02, max: 0.5, step: 0.01 },
+      { k: "linkOpacity", l: "Visibility",  min: 0,    max: 1,   step: 0.01 },
+      { k: "linkWidth",   l: "Thickness",   min: 0.1,  max: 3,   step: 0.1 },
+    ]},
+    { title: "Energy bands", items: [
+      { k: "bandCount",   l: "Band count", min: 0,   max: 14,  step: 1 },
+      { k: "bandOpacity", l: "Visibility", min: 0,   max: 0.5, step: 0.01 },
+      { k: "bandWidth",   l: "Thickness",  min: 0.2, max: 5,   step: 0.1 },
+    ]},
+    { title: "Core", items: [
+      { k: "coreSize",      l: "Size",      min: 0, max: 0.6, step: 0.01 },
+      { k: "coreIntensity", l: "Intensity", min: 0, max: 2,  step: 0.05 },
+      { k: "corePulse",     l: "Pulse",     min: 0, max: 0.6, step: 0.01 },
+    ]},
+    { title: "Glow", items: [
+      { k: "glowColor", l: "Glow color", type: "color", glow: true },
+      { k: "glow1", l: "Inner glow",  min: 0, max: 30,  step: 1, glow: true },
+      { k: "glow2", l: "Mid glow",    min: 0, max: 80,  step: 1, glow: true },
+      { k: "glow3", l: "Outer glow",  min: 0, max: 150, step: 1, glow: true },
+    ]},
+    { title: "Atmosphere", items: [
+      { k: "fogColor",     l: "Fog color", type: "color" },
+      { k: "fogIntensity", l: "Fog",       min: 0, max: 3, step: 0.05 },
+      { k: "vignette",     l: "Vignette",  min: 0, max: 1, step: 0.01 },
+    ]},
+    { title: "Colors", items: [
+      { k: "col1", l: "Primary 1",   type: "color", recolor: true },
+      { k: "col2", l: "Primary 2",   type: "color", recolor: true },
+      { k: "col3", l: "Primary 3",   type: "color", recolor: true },
+      { k: "col4", l: "Highlight 1", type: "color", recolor: true },
+      { k: "col5", l: "Highlight 2", type: "color", recolor: true },
+      { k: "bg0",  l: "Background center", type: "color", bg: true },
+      { k: "bg1",  l: "Background mid",    type: "color", bg: true },
+      { k: "bg2",  l: "Background edge",   type: "color", bg: true },
+    ]},
+  ];
+
+  const groupsEl = document.getElementById("groups");
+  const inputs = {};
+
+  function fmt(v, step) {
+    if (step >= 1) return String(Math.round(v));
+    return (+v).toFixed(step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3);
+  }
+
+  function onChanged(item) {
+    if (item.k === "ringSize") computeR();
+    if (item.reinit) initParticles();
+    if (item.recolor) recolorParticles();
+    if (item.glow) applyGlow();
+    if (item.bg) applyBackground();
+  }
+
+  for (const grp of SCHEMA) {
+    const g = document.createElement("div");
+    g.className = "group";
+    const head = document.createElement("div");
+    head.className = "ghead";
+    head.innerHTML = `<span>${grp.title}</span><span class="arrow">&#9656;</span>`;
+    head.addEventListener("click", () => g.classList.toggle("open"));
+    const body = document.createElement("div");
+    body.className = "gbody";
+
+    for (const item of grp.items) {
+      const row = document.createElement("div");
+      row.className = "row";
+      const label = document.createElement("label");
+      label.textContent = item.l;
+      row.appendChild(label);
+
+      if (item.type === "color") {
+        const inp = document.createElement("input");
+        inp.type = "color";
+        inp.value = CFG[item.k];
+        inp.addEventListener("input", () => {
+          CFG[item.k] = inp.value;
+          onChanged(item);
+          scheduleSave();
+        });
+        inputs[item.k] = { inp, item };
+        row.appendChild(inp);
+      } else {
+        const inp = document.createElement("input");
+        inp.type = "range";
+        inp.min = item.min; inp.max = item.max; inp.step = item.step;
+        inp.value = CFG[item.k];
+        const val = document.createElement("span");
+        val.className = "val";
+        val.textContent = fmt(CFG[item.k], item.step);
+        inp.addEventListener("input", () => {
+          CFG[item.k] = +inp.value;
+          val.textContent = fmt(CFG[item.k], item.step);
+          if (!item.reinit) onChanged(item);
+          scheduleSave();
+        });
+        if (item.reinit) inp.addEventListener("change", () => onChanged(item));
+        inputs[item.k] = { inp, val, item };
+        row.appendChild(inp);
+        row.appendChild(val);
+      }
+      body.appendChild(row);
+    }
+    g.appendChild(head);
+    g.appendChild(body);
+    groupsEl.appendChild(g);
+  }
+  groupsEl.querySelector(".group").classList.add("open");
+
+  // Panel toggle
+  const panel = document.getElementById("panel");
+  const toggle = document.getElementById("panelToggle");
+  toggle.addEventListener("click", () => panel.classList.toggle("hidden"));
+  document.getElementById("hideBtn").addEventListener("click", () => panel.classList.add("hidden"));
+
+  // ---------- Save / Export / Import / Reset ----------
+  const statusMsg = document.getElementById("statusMsg");
+  let statusTimer = null;
+  function showStatus(text) {
+    statusMsg.textContent = text;
+    statusMsg.classList.add("show");
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => statusMsg.classList.remove("show"), 2200);
+  }
+
+  function refreshInputs() {
+    for (const k in inputs) {
+      const { inp, val, item } = inputs[k];
+      inp.value = CFG[k];
+      if (val) val.textContent = fmt(CFG[k], item.step);
+    }
+  }
+
+  function applyAll() {
+    computeR();
+    initParticles();
+    applyGlow();
+    applyBackground();
+  }
+
+  // Save (explicit)
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    saveSettings();
+    showStatus("Settings saved ✓");
+  });
+
+  // Export to JSON file
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(CFG, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "energy-ring-settings.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showStatus("Exported ✓");
+  });
+
+  // Import from JSON file
+  const importFile = document.getElementById("importFile");
+  document.getElementById("importBtn").addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", () => {
+    const file = importFile.files && importFile.files[0];
+    importFile.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(reader.result);
+        const applied = applySettings(obj);
+        if (applied === 0) {
+          showStatus("No valid settings found");
+          return;
+        }
+        refreshInputs();
+        applyAll();
+        saveSettings();
+        showStatus(`Imported (${applied} values) ✓`);
+      } catch (e) {
+        showStatus("Invalid JSON file");
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Reset (also clears saved settings)
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    Object.assign(CFG, DEFAULTS);
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    refreshInputs();
+    applyAll();
+    showStatus("Reset to defaults");
+  });
+})();
+</script>
+</body>
+</html>
