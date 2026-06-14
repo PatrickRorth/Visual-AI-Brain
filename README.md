@@ -2,6 +2,8 @@
 
 Interactive holographic AI energy core rendered on HTML5 canvas — a noise-deformed particle ring with a glowing nucleus, energy bands, and a living network of connections. Single self-contained file with a live control panel to tweak everything, plus localStorage save and JSON export/import. Zero dependencies.
 
+![Visual AI Brain](./Visual-AI-Brain.png)
+
 ## Preview
 
 A minimalist, futuristic energy field on a near-black background: thousands of glowing particles and lines flow in organic, water/plasma-like waves around a luminous core — like looking into the mind of a super-AI.
