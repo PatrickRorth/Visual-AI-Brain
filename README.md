@@ -22,7 +22,7 @@ A minimalist, futuristic energy field on a near-black background: thousands of g
 Just open the file in any modern browser:
 
 ```
-ai-energy-ring.html
+Visual-AI-Brain.html
 ```
 
 Double-click it, or serve it from any static host.
@@ -46,7 +46,7 @@ Click the gear icon (⚙) in the top-right corner to open the panel.
 Drop it into your own page via an `<iframe>`:
 
 ```html
-<iframe src="ai-energy-ring.html" style="border:0;width:100%;height:100vh"></iframe>
+<iframe src="Visual-AI-Brain.html" style="border:0;width:100%;height:100vh"></iframe>
 ```
 
 ## License
