@@ -1,4 +1,4 @@
-# AI Energy Core
+# Visual AI Brain
 
 Interactive holographic AI energy core rendered on HTML5 canvas — a noise-deformed particle ring with a glowing nucleus, energy bands, and a living network of connections. Single self-contained file with a live control panel to tweak everything, plus localStorage save and JSON export/import. Zero dependencies.
 
